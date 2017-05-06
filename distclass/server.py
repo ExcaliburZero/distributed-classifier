@@ -13,6 +13,8 @@ class Server(object):
 
     app = Flask(__name__)
     jobs_queue = queue.Queue()
+    active_jobs = set({})
+    results = []
 
     def start_server(self):
         """
@@ -24,13 +26,13 @@ class Server(object):
         self.jobs_queue.put(job2)
         self.app.run()
 
-    def add_job(self, json_data):
+    def add_job(self, job):
         """
         Adds the given job to the queue.
 
         Parameters
         ----------
-        json_data : dict
+        job : dict
             The job to be added to the queue. If None then the job add will
             fail.
 
@@ -39,10 +41,7 @@ class Server(object):
         result : str
             A string indicating if the add succedded or not.
         """
-        if json_data != None:
-            name = json_data["name"]
-            value = json_data["value"]
-            job = {"name": name, "value": value}
+        if job != None:
             self.jobs_queue.put(job)
             print(str(job))
             return "Job added"
@@ -59,8 +58,41 @@ class Server(object):
             A json string representing the next job.
         """
         job = self.jobs_queue.get()
+        self.active_jobs.add(dict_key(job))
         print(str(job))
+        print("Active Jobs: " + str(self.active_jobs))
         return json.dumps(job)
+
+    def post_result(self, job, result):
+        """
+        Records the given result and removes the given job from the active jobs.
+
+        If the given job is not active, then nothing is done and an error
+        message is returned.
+
+        Parameters
+        ----------
+        job : dict
+          The job associated with the given result.
+
+        result : double
+          The result for the given job.
+        """
+        if job != None and result != None:
+            try:
+                self.active_jobs.remove(dict_key(job))
+                entry = (job, result)
+                self.results.append(entry)
+                print(str(entry))
+                print("Active Jobs: " + str(self.active_jobs))
+                return "Job result posted"
+            except KeyError:
+                return "The given job is not active"
+        else:
+            return "Invalid job or result"
+
+def dict_key(d):
+    return frozenset(d.items())
 
 def run_server():
     """
@@ -71,11 +103,30 @@ def run_server():
     @server.app.route("/addjob", methods=['POST'])
     def add_job():
         json_data = request.get_json()
-        return server.add_job(json_data)
+        try:
+            name = json_data["name"]
+            value = json_data["value"]
+            job = {"name": name, "value": value}
+            return server.add_job(job)
+        except KeyError:
+            return "Invalid job add. Be sure to include the job name and value."
 
     @server.app.route("/getjob")
     def get_job():
         return server.get_job()
+
+    @server.app.route("/postresult", methods=['POST'])
+    def post_result():
+        json_data = request.get_json()
+        try:
+            name = json_data["name"]
+            value = json_data["value"]
+            result = json_data["result"]
+
+            job = {"name": name, "value": value}
+            return server.post_result(job, result)
+        except KeyError:
+            return "Invalid result posting. Be sure to include the job name, value, and result."
 
     server.start_server()
 
