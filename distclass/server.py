@@ -1,10 +1,13 @@
 """
 Defines the server.
 """
+import colorama
 import json
 import queue
+from colorama import Fore, Back, Style
 from flask import Flask
 from flask import request
+from typing import Tuple
 
 class Server(object):
     """
@@ -26,7 +29,16 @@ class Server(object):
         self.jobs_queue.put(job2)
         self.app.run()
 
-    def add_job(self, job):
+    def print_job(self, job: dict):
+        print(Fore.YELLOW + str(job) + Style.RESET_ALL)
+
+    def print_result(self, entry: Tuple[dict, float]):
+        print(Fore.YELLOW + str(entry) + Style.RESET_ALL)
+
+    def print_active_jobs(self):
+        print("Active Jobs: " + Fore.RED + str(self.active_jobs) + Style.RESET_ALL)
+
+    def add_job(self, job: dict):
         """
         Adds the given job to the queue.
 
@@ -43,7 +55,7 @@ class Server(object):
         """
         if job != None:
             self.jobs_queue.put(job)
-            print(str(job))
+            self.print_job(job)
             return "Job added"
         else:
             return "Invalid job format, be sure to use the application/json content type"
@@ -59,11 +71,11 @@ class Server(object):
         """
         job = self.jobs_queue.get()
         self.active_jobs.add(dict_key(job))
-        print(str(job))
-        print("Active Jobs: " + str(self.active_jobs))
+        self.print_job(job)
+        self.print_active_jobs()
         return json.dumps(job)
 
-    def post_result(self, job, result):
+    def post_result(self, job: dict, result: float):
         """
         Records the given result and removes the given job from the active jobs.
 
@@ -75,7 +87,7 @@ class Server(object):
         job : dict
           The job associated with the given result.
 
-        result : double
+        result : float
           The result for the given job.
         """
         if job != None and result != None:
@@ -83,8 +95,8 @@ class Server(object):
                 self.active_jobs.remove(dict_key(job))
                 entry = (job, result)
                 self.results.append(entry)
-                print(str(entry))
-                print("Active Jobs: " + str(self.active_jobs))
+                self.print_result(entry)
+                self.print_active_jobs()
                 return "Job result posted"
             except KeyError:
                 return "The given job is not active"
@@ -131,4 +143,5 @@ def run_server():
     server.start_server()
 
 if __name__ == "__main__":
+    colorama.init()
     run_server()

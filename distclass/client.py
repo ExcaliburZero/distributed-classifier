@@ -1,16 +1,25 @@
-from typing import Union
+import colorama
 import json
 import requests
+from colorama import Fore, Back, Style
+from typing import Union
 
 def run_client(api_url: str):
     keep_going = True
     while keep_going:
-        command = input("> ")
+        command = prompt_command()
 
         if command == "quit":
             keep_going = False
         elif command == "job":
             get_job_command(api_url)
+
+def prompt_command() -> str:
+    prompt = "> "
+    print(Fore.YELLOW + prompt + Style.RESET_ALL, end='')
+
+    command = input("")
+    return command
 
 def get_job_command(api_url: str):
     job = grab_job(api_url)
@@ -63,4 +72,6 @@ def send_result(api_url: str, job: dict, result: float) -> Union[str, None]:
 
 if __name__ == "__main__":
     api_url = "http://localhost:5000"
+
+    colorama.init()
     run_client(api_url)
