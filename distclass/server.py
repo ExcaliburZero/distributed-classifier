@@ -5,6 +5,7 @@ import curses
 import json
 import logging
 import queue
+import time
 from flask import Flask
 from flask import request
 from typing import Tuple
@@ -48,59 +49,61 @@ class Server(object):
         self.app.run(threaded = True)
 
     def update_screen(self):
-        if not self.updating:
-            self.updating = True
-            self.stdscr.clear()
-            line = 0
+        while self.updating:
+            time.sleep(0.001)
 
-            # Display job queue
-            self.stdscr.addstr(line, 0, "Queued Jobs")
-            line += 1
-            self.stdscr.addstr(line, 0, "-----------")
-            line += 1
+        self.updating = True
+        self.stdscr.clear()
+        line = 0
 
-            count = 1
-            queue_copy = self.jobs_queue.copy()
-            for job in queue_copy:
-                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
-                self.stdscr.addstr(line, 0, output)
-                line += 1
-                count += 1
+        # Display job queue
+        self.stdscr.addstr(line, 0, "Queued Jobs")
+        line += 1
+        self.stdscr.addstr(line, 0, "-----------")
+        line += 1
 
-            # Display active jobs
+        count = 1
+        queue_copy = self.jobs_queue.copy()
+        for job in queue_copy:
+            output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
+            self.stdscr.addstr(line, 0, output)
             line += 1
-            self.stdscr.addstr(line, 0, "Active Jobs")
-            line += 1
-            self.stdscr.addstr(line, 0, "-----------")
-            line += 1
+            count += 1
 
-            count = 1
-            active = self.active_jobs.copy()
-            for job in active:
-                job = dict(job)
-                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
-                self.stdscr.addstr(line, 0, output)
-                line += 1
-                count += 1
+        # Display active jobs
+        line += 1
+        self.stdscr.addstr(line, 0, "Active Jobs")
+        line += 1
+        self.stdscr.addstr(line, 0, "-----------")
+        line += 1
 
-            # Display completed jobs
+        count = 1
+        active = self.active_jobs.copy()
+        for job in active:
+            job = dict(job)
+            output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
+            self.stdscr.addstr(line, 0, output)
             line += 1
-            self.stdscr.addstr(line, 0, "Completed Jobs")
-            line += 1
-            self.stdscr.addstr(line, 0, "-----------")
-            line += 1
+            count += 1
 
-            count = 1
-            results = self.results.copy()
-            for result in results:
-                job = result[0]
-                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"]) + " => " + str(result[1])
-                self.stdscr.addstr(line, 0, output)
-                line += 1
-                count += 1
+        # Display completed jobs
+        line += 1
+        self.stdscr.addstr(line, 0, "Completed Jobs")
+        line += 1
+        self.stdscr.addstr(line, 0, "-----------")
+        line += 1
 
-            self.stdscr.refresh()
-            self.updating = False
+        count = 1
+        results = self.results.copy()
+        for result in results:
+            job = result[0]
+            output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"]) + " => " + str(result[1])
+            self.stdscr.addstr(line, 0, output)
+            line += 1
+            count += 1
+
+        self.stdscr.refresh()
+        self.updating = False
 
     def add_job(self, job: dict):
         """
