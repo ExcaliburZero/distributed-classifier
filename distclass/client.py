@@ -13,6 +13,8 @@ def run_client(api_url: str):
             keep_going = False
         elif command == "job":
             get_job_command(api_url)
+        elif command == "add":
+            add_job_command(api_url)
 
 def prompt_command() -> str:
     prompt = "> "
@@ -34,6 +36,22 @@ def get_job_command(api_url: str):
         if isinstance(response, str):
             print(response)
 
+def add_job_command(api_url: str):
+    name = input("name: ")
+
+    value = None
+    while value == None:
+        try:
+            value_string = input("value: ")
+            value = int(value_string)
+        except ValueError:
+            print("Invalid value: " + value_string)
+
+    job = {"name": name, "value": value}
+    response = send_job(api_url, job)
+    if isinstance(response, str):
+        print(response)
+
 def prompt_result() -> float:
     while True:
         result_string = input("Result: ")
@@ -54,6 +72,19 @@ def grab_job(api_url: str) -> Union[str, dict]:
         return job
     except requests.exceptions.ConnectionError:
         return "Unable to connect to api url: " + query_url
+
+def send_job(api_url: str, job: dict) -> Union[str, None]:
+    add_path = "/addjob"
+    post_url = api_url + add_path
+    headers = {"content-type": "application/json"}
+
+    job_string = json.dumps(job)
+
+    try:
+        requests.post(post_url, data = job_string, headers = headers)
+        return None
+    except requests.exceptions.ConnectionError:
+        return "Unable to connect to api url: " + post_url
 
 def send_result(api_url: str, job: dict, result: float) -> Union[str, None]:
     result_path = "/postresult"
