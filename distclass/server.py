@@ -27,7 +27,7 @@ class Server(object):
         job2 = {"name": "Second", "value": 3}
         self.jobs_queue.put(job1)
         self.jobs_queue.put(job2)
-        self.app.run()
+        self.app.run(threaded = True)
 
     def print_job(self, job: dict):
         print(Fore.YELLOW + str(job) + Style.RESET_ALL)
