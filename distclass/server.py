@@ -1,23 +1,34 @@
 """
 Defines the server.
 """
-import colorama
+import curses
 import json
+import logging
 import queue
-from colorama import Fore, Back, Style
 from flask import Flask
 from flask import request
 from typing import Tuple
+
+import job_queue
 
 class Server(object):
     """
     A distributed classifier server.
     """
 
-    app = Flask(__name__)
-    jobs_queue = queue.Queue()
-    active_jobs = set({})
-    results = []
+    app = None
+    jobs_queue = None
+    active_jobs = None
+    results = None
+    stdscr = None
+    updating = None
+
+    def __init__(self, stdscr):
+        self.app = Flask(__name__)
+        self.jobs_queue = job_queue.JobQueue()
+        self.active_jobs = set({})
+        self.results = []
+        self.stdscr = stdscr
 
     def start_server(self):
         """
@@ -25,18 +36,71 @@ class Server(object):
         """
         job1 = {"name": "First", "value": 1}
         job2 = {"name": "Second", "value": 3}
-        self.jobs_queue.put(job1)
-        self.jobs_queue.put(job2)
+        self.jobs_queue.append(job1)
+        self.jobs_queue.append(job2)
+
+        curses.noecho()
+        self.updating = False
+        self.update_screen()
+
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
         self.app.run(threaded = True)
 
-    def print_job(self, job: dict):
-        print(Fore.YELLOW + str(job) + Style.RESET_ALL)
+    def update_screen(self):
+        if not self.updating:
+            self.updating = True
+            self.stdscr.clear()
+            line = 0
 
-    def print_result(self, entry: Tuple[dict, float]):
-        print(Fore.YELLOW + str(entry) + Style.RESET_ALL)
+            # Display job queue
+            self.stdscr.addstr(line, 0, "Queued Jobs")
+            line += 1
+            self.stdscr.addstr(line, 0, "-----------")
+            line += 1
 
-    def print_active_jobs(self):
-        print("Active Jobs: " + Fore.RED + str(self.active_jobs) + Style.RESET_ALL)
+            count = 1
+            queue_copy = self.jobs_queue.copy()
+            for job in queue_copy:
+                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
+                self.stdscr.addstr(line, 0, output)
+                line += 1
+                count += 1
+
+            # Display active jobs
+            line += 1
+            self.stdscr.addstr(line, 0, "Active Jobs")
+            line += 1
+            self.stdscr.addstr(line, 0, "-----------")
+            line += 1
+
+            count = 1
+            active = self.active_jobs.copy()
+            for job in active:
+                job = dict(job)
+                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"])
+                self.stdscr.addstr(line, 0, output)
+                line += 1
+                count += 1
+
+            # Display completed jobs
+            line += 1
+            self.stdscr.addstr(line, 0, "Completed Jobs")
+            line += 1
+            self.stdscr.addstr(line, 0, "-----------")
+            line += 1
+
+            count = 1
+            results = self.results.copy()
+            for result in results:
+                job = result[0]
+                output = " " + str(count) + ") " + job["name"] + " ~ " + str(job["value"]) + " => " + str(result[1])
+                self.stdscr.addstr(line, 0, output)
+                line += 1
+                count += 1
+
+            self.stdscr.refresh()
+            self.updating = False
 
     def add_job(self, job: dict):
         """
@@ -54,8 +118,8 @@ class Server(object):
             A string indicating if the add succedded or not.
         """
         if job != None:
-            self.jobs_queue.put(job)
-            self.print_job(job)
+            self.jobs_queue.append(job)
+            self.update_screen()
             return "Job added"
         else:
             return "Invalid job format, be sure to use the application/json content type"
@@ -69,10 +133,9 @@ class Server(object):
         result : str
             A json string representing the next job.
         """
-        job = self.jobs_queue.get()
+        job = self.jobs_queue.popleft()
         self.active_jobs.add(dict_key(job))
-        self.print_job(job)
-        self.print_active_jobs()
+        self.update_screen()
         return json.dumps(job)
 
     def post_result(self, job: dict, result: float):
@@ -95,8 +158,7 @@ class Server(object):
                 self.active_jobs.remove(dict_key(job))
                 entry = (job, result)
                 self.results.append(entry)
-                self.print_result(entry)
-                self.print_active_jobs()
+                self.update_screen()
                 return "Job result posted"
             except KeyError:
                 return "The given job is not active"
@@ -106,11 +168,11 @@ class Server(object):
 def dict_key(d):
     return frozenset(d.items())
 
-def run_server():
+def run_server(stdscr):
     """
     Creates and runs the server.
     """
-    server = Server()
+    server = Server(stdscr)
 
     @server.app.route("/addjob", methods=['POST'])
     def add_job():
@@ -143,5 +205,4 @@ def run_server():
     server.start_server()
 
 if __name__ == "__main__":
-    colorama.init()
-    run_server()
+    curses.wrapper(run_server)
